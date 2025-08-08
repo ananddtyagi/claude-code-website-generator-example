@@ -186,10 +186,32 @@ export function ResizableLayout() {
     }
   }, [currentProject])
 
+  // Handler for AI-driven file changes (path-based)
+  const handleAIFileChange = useCallback((path: string, content: string) => {
+    if (!currentProject) return
+
+    console.log('AI file change:', path, 'content length:', content.length)
+
+    // Find the file node by path
+    const fileNode = Array.from(currentProject.nodes.values()).find(node => 
+      node.path === path && node.type === 'file'
+    )
+    
+    if (fileNode) {
+      handleFileChange(fileNode.id, content)
+    }
+  }, [currentProject, handleFileChange])
+
   if (!isClient) {
     return (
       <div className="h-full grid grid-cols-1 md:grid-cols-3">
-        <div className="hidden md:block"><ChatPanel /></div>
+        <div className="hidden md:block">
+          <ChatPanel 
+            project={currentProject}
+            onFileChange={handleAIFileChange}
+            onProjectUpdate={handleProjectChange}
+          />
+        </div>
         <div className="hidden md:block">
           <div className="h-full flex flex-col">
             <div className="h-1/3 min-h-[200px] border-b">
@@ -235,7 +257,11 @@ export function ResizableLayout() {
             maxSize={75}
             className="min-w-[240px]"
           >
-            <ChatPanel />
+            <ChatPanel 
+              project={currentProject}
+              onFileChange={handleAIFileChange}
+              onProjectUpdate={handleProjectChange}
+            />
           </Panel>
           
           <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
