@@ -1,0 +1,319 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { query } from '@anthropic-ai/claude-code'
+import { ProjectContext, AIConfiguration } from '../../../../lib/ai/types'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+interface ChatRequest {
+  message: string
+  context: ProjectContext
+  config: AIConfiguration
+  sessionId?: string
+}
+
+function generateSystemPrompt(context: ProjectContext): string {
+  return `You are an expert full-stack developer helping with a Next.js website generator project named "${context.name}".
+
+CONTEXT:
+- You're working with a virtual filesystem that supports creating, editing, and deleting files
+- The project uses Next.js 15 with TypeScript, React 19, Tailwind CSS, and Monaco Editor
+- Current file structure: ${summarizeFileStructure(context.structure)}
+- Currently open files: ${context.openFiles.join(', ') || 'none'}
+- Current file being edited: ${context.currentFile || 'none'}
+
+CAPABILITIES:
+- Analyze the existing codebase and project structure
+- Create new files and directories
+- Update existing file contents
+- Delete files when necessary
+- Provide architectural guidance and best practices
+
+CONSTRAINTS:
+- Only work with files in these directories: /app, /components, /public, /styles, /lib
+- Follow Next.js 15 App Router conventions
+- Use TypeScript for all code files
+- Follow the existing code patterns and component structure
+- Maintain consistency with Tailwind CSS styling
+- Keep files under 5MB in size
+
+RESPONSE FORMAT:
+When making file changes, always propose a structured plan with:
+1. Clear description of what you're doing
+2. List of specific file changes (create/update/delete)
+3. Brief reasoning for the changes
+
+Be concise but thorough. Focus on practical implementation details.`
+}
+
+function summarizeFileStructure(node: unknown, prefix = '', maxDepth = 3, currentDepth = 0): string {
+  if (!node || typeof node !== 'object' || currentDepth >= maxDepth) return ''
+  
+  const nodeObj = node as { name?: string; type?: string; children?: Record<string, unknown> }
+  if (!nodeObj.name) return ''
+  
+  let summary = prefix + nodeObj.name + (nodeObj.type === 'directory' ? '/' : '') + '\n'
+  
+  if (nodeObj.type === 'directory' && nodeObj.children && currentDepth < maxDepth - 1) {
+    const sortedChildren = Object.values(nodeObj.children)
+      .filter((child): child is { name: string; type: string } => 
+        typeof child === 'object' && child !== null && 
+        'name' in child && 'type' in child
+      )
+      .sort((a, b) => {
+        // Directories first, then files
+        if (a.type !== b.type) {
+          return a.type === 'directory' ? -1 : 1
+        }
+        return a.name.localeCompare(b.name)
+      })
+      .slice(0, 10) // Limit to first 10 items per directory
+    
+    for (const child of sortedChildren) {
+      summary += summarizeFileStructure(child, prefix + '  ', maxDepth, currentDepth + 1)
+    }
+    
+    if (Object.keys(nodeObj.children).length > 10) {
+      summary += prefix + '  ... and more files\n'
+    }
+  }
+  
+  return summary
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: ChatRequest = await request.json()
+    const { message, context, config, sessionId } = body
+
+    // Validate required fields
+    if (!message || !context) {
+      return NextResponse.json(
+        { error: 'Missing required fields: message and context' },
+        { status: 400 }
+      )
+    }
+
+    // Set up streaming response
+    const encoder = new TextEncoder()
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Generate system prompt
+        const systemPrompt = generateSystemPrompt(context)
+
+        // Start AI query
+        try {
+          let fullResponse = ''
+
+          for await (const response of query({
+            prompt: message,
+            options: {
+              appendSystemPrompt: systemPrompt,
+              maxTurns: config.maxTurns || 5,
+              allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch"],
+              ...(sessionId && { resumeSessionId: sessionId })
+            }
+          })) {
+            
+            if (response.type === 'system' && response.subtype === 'init') {
+              const data = {
+                type: 'message',
+                content: '',
+                metadata: { sessionId: response.session_id }
+              }
+              controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'))
+            }
+            
+            if (response.type === 'assistant') {
+              // Handle streaming assistant message
+              const content = response.message.content
+              if (Array.isArray(content)) {
+                for (const block of content) {
+                  if (block.type === 'text') {
+                    fullResponse += block.text
+                    const data = {
+                      type: 'message',
+                      content: block.text
+                    }
+                    controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'))
+                  }
+                }
+              }
+            }
+            
+            if (response.type === 'result') {
+              const data = {
+                type: 'complete',
+                content: response.subtype === 'success' ? response.result : `Operation ${response.subtype}`,
+                metadata: {
+                  cost: response.total_cost_usd,
+                  duration: response.duration_ms,
+                  sessionId: response.session_id
+                }
+              }
+              controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'))
+              
+              // Try to extract a plan from the full response
+              const plan = extractPlanFromResponse(fullResponse)
+              if (plan) {
+                const planData = {
+                  type: 'plan',
+                  content: 'Plan extracted from response',
+                  plan
+                }
+                controller.enqueue(encoder.encode(JSON.stringify(planData) + '\n'))
+              }
+              
+              controller.close()
+              return
+            }
+          }
+        } catch (error) {
+          console.error('AI query error:', error)
+          const errorData = {
+            type: 'error',
+            content: 'Failed to communicate with AI service',
+            error: error instanceof Error ? error.message : String(error)
+          }
+          controller.enqueue(encoder.encode(JSON.stringify(errorData) + '\n'))
+          controller.close()
+        }
+      }
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
+
+  } catch (error) {
+    console.error('API route error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+interface ExtractedPlan {
+  id: string
+  description: string
+  changes: Array<{
+    type: 'create' | 'update' | 'delete'
+    path: string
+    content?: string
+  }>
+  reasoning?: string
+  timestamp: number
+}
+
+function extractPlanFromResponse(content: string): ExtractedPlan | null {
+  try {
+    // Look for JSON-like structures in the response
+    const jsonRegex = /\{[\s\S]*"changes"[\s\S]*\}/g
+    const matches = content.match(jsonRegex)
+    
+    if (!matches) return parseTextualPlan(content)
+    
+    for (const match of matches) {
+      try {
+        const parsed = JSON.parse(match)
+        if (parsed.changes && Array.isArray(parsed.changes)) {
+          return {
+            id: crypto.randomUUID(),
+            description: parsed.description || 'AI-generated plan',
+            changes: parsed.changes,
+            reasoning: parsed.reasoning,
+            timestamp: Date.now()
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+    
+    return parseTextualPlan(content)
+  } catch (error) {
+    console.error('Error extracting plan:', error)
+    return null
+  }
+}
+
+function parseTextualPlan(content: string): ExtractedPlan | null {
+  const changes: Array<{ type: 'create' | 'update' | 'delete'; path: string; content?: string }> = []
+  const lines = content.split('\n')
+  
+  let currentChange: { type?: 'create' | 'update' | 'delete'; path?: string; content?: string } = {}
+  let inCodeBlock = false
+  let codeContent: string[] = []
+  
+  for (const line of lines) {
+    // Detect file operations
+    const createMatch = line.match(/(?:create|add|new)\s+(?:file\s+)?([^\s]+\.(tsx?|jsx?|css|json|md))/i)
+    const updateMatch = line.match(/(?:update|modify|edit)\s+(?:file\s+)?([^\s]+\.(tsx?|jsx?|css|json|md))/i)
+    const deleteMatch = line.match(/(?:delete|remove)\s+(?:file\s+)?([^\s]+\.(tsx?|jsx?|css|json|md))/i)
+    
+    if (createMatch) {
+      if (currentChange.type && currentChange.path) {
+        changes.push(currentChange as { type: 'create' | 'update' | 'delete'; path: string; content?: string })
+      }
+      currentChange = { type: 'create', path: createMatch[1] }
+    } else if (updateMatch) {
+      if (currentChange.type && currentChange.path) {
+        changes.push(currentChange as { type: 'create' | 'update' | 'delete'; path: string; content?: string })
+      }
+      currentChange = { type: 'update', path: updateMatch[1] }
+    } else if (deleteMatch) {
+      if (currentChange.type && currentChange.path) {
+        changes.push(currentChange as { type: 'create' | 'update' | 'delete'; path: string; content?: string })
+      }
+      currentChange = { type: 'delete', path: deleteMatch[1] }
+      if (currentChange.path) {
+        changes.push(currentChange as { type: 'create' | 'update' | 'delete'; path: string; content?: string })
+      }
+      currentChange = {}
+    }
+    
+    // Detect code blocks
+    if (line.startsWith('```')) {
+      if (inCodeBlock && currentChange.type) {
+        currentChange.content = codeContent.join('\n')
+        codeContent = []
+      }
+      inCodeBlock = !inCodeBlock
+    } else if (inCodeBlock) {
+      codeContent.push(line)
+    }
+  }
+  
+  // Add final change
+  if (currentChange.type && currentChange.path) {
+    if (codeContent.length > 0) {
+      currentChange.content = codeContent.join('\n')
+    }
+    changes.push(currentChange as { type: 'create' | 'update' | 'delete'; path: string; content?: string })
+  }
+  
+  if (changes.length === 0) return null
+  
+  // Filter to valid paths
+  const validChanges = changes.filter(change => {
+    const allowedDirs = ['/app', '/components', '/public', '/styles', '/lib']
+    return allowedDirs.some(dir => change.path.startsWith(dir)) && 
+           !change.path.includes('..') && 
+           !change.path.includes('//') &&
+           change.path.length > 0 &&
+           change.path.length < 500
+  })
+  
+  return validChanges.length > 0 ? {
+    id: crypto.randomUUID(),
+    description: 'Extracted plan from AI response',
+    changes: validChanges,
+    timestamp: Date.now()
+  } : null
+}

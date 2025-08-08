@@ -43,6 +43,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
   const [isApplying, setIsApplying] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [apiKey, setApiKey] = useState('')
+  const [useMockAI, setUseMockAI] = useState(false)
 
   // Initialize AI service
   useEffect(() => {
@@ -66,9 +67,11 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
   }
 
   const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('anthropic-api-key', apiKey.trim())
-      initializeAIService(apiKey.trim())
+    if (useMockAI || apiKey.trim()) {
+      if (apiKey.trim()) {
+        localStorage.setItem('anthropic-api-key', apiKey.trim())
+      }
+      initializeAIService(apiKey.trim() || 'mock-key')
     }
   }
 
@@ -151,8 +154,10 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
     setCurrentPlan(null)
 
     try {
-      // For now, use the mock implementation
-      const responseStream = aiService.mockStreamChat(message, context)
+      // Use the real AI implementation or mock based on user preference
+      const responseStream = useMockAI 
+        ? aiService.mockStreamChat(message, context)
+        : aiService.streamChat(message, context)
       
       for await (const response of responseStream) {
         switch (response.type) {
@@ -188,7 +193,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
       })
       setChatState(prev => ({ ...prev, isLoading: false }))
     }
-  }, [aiService, buildProjectContext])
+  }, [aiService, buildProjectContext, useMockAI])
 
   const handlePreviewChange = (change: FileChange) => {
     if (!project) return
@@ -246,7 +251,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
               const existingNode = operations.getNodeByPath(change.path)
               if (existingNode && isFile(existingNode) && change.content !== undefined) {
                 existingNode.content = change.content
-                existingNode.updatedAt = new Date().toISOString()
+                existingNode.updatedAt = new Date()
                 hasChanges = true
                 
                 // Notify parent component of file change
@@ -271,7 +276,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
 
       if (hasChanges) {
         // Update project timestamp
-        project.updatedAt = new Date().toISOString()
+        project.updatedAt = new Date()
         onProjectUpdate(project)
         
         // Add success message
@@ -326,12 +331,25 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
             </p>
           </div>
           
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="useMockAI"
+              checked={useMockAI}
+              onChange={(e) => setUseMockAI(e.target.checked)}
+              className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+            />
+            <label htmlFor="useMockAI" className="text-sm text-muted-foreground">
+              Use mock AI for testing (no API calls)
+            </label>
+          </div>
+          
           <Button 
             onClick={handleSaveApiKey}
-            disabled={!apiKey.trim()}
+            disabled={!useMockAI && !apiKey.trim()}
             className="w-full"
           >
-            Save and Start Chatting
+            {useMockAI ? 'Start Chatting (Mock)' : 'Save and Start Chatting'}
           </Button>
         </div>
       </div>
