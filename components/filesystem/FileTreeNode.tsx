@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, MoreHorizontal } from 'lucide-react'
-import { FSNode, isDirectory, isFile } from '../../lib/filesystem/types'
+import { FSNode, isDirectory } from '../../lib/filesystem/types'
 import { Button } from '../ui/button'
 import { 
   DropdownMenu, 
@@ -18,7 +18,7 @@ interface FileTreeNodeProps {
   isExpanded: boolean
   isSelected: boolean
   isRenaming: boolean
-  children?: FSNode[]
+  childNodes?: FSNode[]
   onToggle: (nodeId: string) => void
   onSelect: (nodeId: string) => void
   onRename: (nodeId: string, newName: string) => void
@@ -35,7 +35,7 @@ export function FileTreeNode({
   isExpanded,
   isSelected,
   isRenaming,
-  children = [],
+  childNodes = [],
   onToggle,
   onSelect,
   onRename,
@@ -177,7 +177,7 @@ export function FileTreeNode({
         )}
       </div>
       
-      {canHaveChildren && isExpanded && children.map((child) => (
+      {canHaveChildren && isExpanded && childNodes.map((child) => (
         <FileTreeNode
           key={child.id}
           node={child}

@@ -5,7 +5,7 @@ import { FSNode, Project, DirectoryNode, isDirectory } from '../../lib/filesyste
 import { FileSystemOperations } from '../../lib/filesystem/operations'
 import { FileTreeNode } from './FileTreeNode'
 import { Button } from '../ui/button'
-import { Plus, FolderPlus, FileText } from 'lucide-react'
+import { FolderPlus, FileText } from 'lucide-react'
 
 interface FileTreeProps {
   project: Project | null
@@ -241,7 +241,7 @@ export function FileTree({
             isExpanded={expandedNodes.has(node.id)}
             isSelected={selectedNodeId === node.id}
             isRenaming={renamingNodeId === node.id}
-            children={getNodeChildren(node.id)}
+            childNodes={getNodeChildren(node.id)}
             onToggle={handleToggle}
             onSelect={handleSelect}
             onRename={handleRename}

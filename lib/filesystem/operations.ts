@@ -13,7 +13,6 @@ import {
   normalizePath,
   joinPath,
   dirname,
-  basename,
   validateFileName,
   isSubPath
 } from './path-utils'

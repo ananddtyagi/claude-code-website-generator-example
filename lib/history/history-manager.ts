@@ -299,7 +299,7 @@ export class FileSystemCommand {
 export function useKeyboardShortcuts(
   historyManager: HistoryManager,
   onStateChange: () => void
-): void {
+): () => void {
   const handleKeyDown = (event: KeyboardEvent) => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
     const ctrlOrCmd = isMac ? event.metaKey : event.ctrlKey

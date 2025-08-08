@@ -19,6 +19,7 @@ interface ProjectDB extends DBSchema {
   metadata: {
     key: string
     value: {
+      key: string
       lastProjectId?: string
       version: number
     }
@@ -196,7 +197,7 @@ export class ProjectStore {
       }
       
       if (node.type === 'directory') {
-        newNode.children = []
+        (newNode as DirectoryNode).children = []
       }
       
       duplicatedNodes.set(newId, newNode)
@@ -264,7 +265,7 @@ export class ProjectStore {
     })
   }
 
-  setupAutosave(project: Project, onChange: () => void): () => void {
+  setupAutosave(getProject: () => Project | null, onChange: () => void): () => void {
     const scheduleAutosave = () => {
       if (this.autosaveTimer) {
         clearTimeout(this.autosaveTimer)
@@ -272,8 +273,11 @@ export class ProjectStore {
       
       this.autosaveTimer = setTimeout(async () => {
         try {
-          await this.saveProject(project)
-          onChange()
+          const currentProject = getProject()
+          if (currentProject) {
+            await this.saveProject(currentProject)
+            onChange()
+          }
         } catch (error) {
           console.error('Autosave failed:', error)
         }
