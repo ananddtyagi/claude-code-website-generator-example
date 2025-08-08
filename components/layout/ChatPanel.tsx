@@ -235,37 +235,69 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
           switch (change.type) {
             case 'create':
               if (change.content !== undefined) {
-                // Extract directory and filename
-                const pathParts = change.path.split('/')
-                const filename = pathParts.pop()
-                const parentPath = pathParts.join('/') || '/'
-                
-                if (filename) {
-                  operations.createFile(parentPath, filename, change.content)
+                // Check if file already exists
+                const existingNode = operations.getNodeByPath(change.path)
+                if (existingNode && isFile(existingNode)) {
+                  // File exists, update it instead
+                  console.log(`File ${change.path} already exists, updating instead of creating`)
+                  existingNode.content = change.content
+                  existingNode.updatedAt = new Date()
                   hasChanges = true
+                  
+                  // Notify parent component of file change
+                  if (onFileChange) {
+                    onFileChange(change.path, change.content)
+                  }
+                } else {
+                  // File doesn't exist, create it
+                  try {
+                    const pathParts = change.path.split('/')
+                    const filename = pathParts.pop()
+                    const parentPath = pathParts.join('/') || '/'
+                    
+                    if (filename) {
+                      operations.createFile(parentPath, filename, change.content)
+                      hasChanges = true
+                    }
+                  } catch (error) {
+                    console.warn(`Failed to create file ${change.path}:`, error)
+                    // Continue with other changes instead of failing completely
+                  }
                 }
               }
               break
               
             case 'update':
-              const existingNode = operations.getNodeByPath(change.path)
-              if (existingNode && isFile(existingNode) && change.content !== undefined) {
-                existingNode.content = change.content
-                existingNode.updatedAt = new Date()
-                hasChanges = true
-                
-                // Notify parent component of file change
-                if (onFileChange) {
-                  onFileChange(change.path, change.content)
+              try {
+                const existingNode = operations.getNodeByPath(change.path)
+                if (existingNode && isFile(existingNode) && change.content !== undefined) {
+                  existingNode.content = change.content
+                  existingNode.updatedAt = new Date()
+                  hasChanges = true
+                  
+                  // Notify parent component of file change
+                  if (onFileChange) {
+                    onFileChange(change.path, change.content)
+                  }
+                } else {
+                  console.warn(`Cannot update file ${change.path}: file not found or is not a file`)
                 }
+              } catch (error) {
+                console.warn(`Failed to update file ${change.path}:`, error)
               }
               break
               
             case 'delete':
-              const nodeToDelete = operations.getNodeByPath(change.path)
-              if (nodeToDelete) {
-                operations.deleteNode(nodeToDelete.id)
-                hasChanges = true
+              try {
+                const nodeToDelete = operations.getNodeByPath(change.path)
+                if (nodeToDelete) {
+                  operations.deleteNode(nodeToDelete.id)
+                  hasChanges = true
+                } else {
+                  console.warn(`Cannot delete file ${change.path}: file not found`)
+                }
+              } catch (error) {
+                console.warn(`Failed to delete file ${change.path}:`, error)
               }
               break
           }

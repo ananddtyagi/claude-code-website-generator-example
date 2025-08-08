@@ -13,7 +13,9 @@ export class ClientAIService {
 
   async* streamChat(message: string, context: ProjectContext): AsyncGenerator<StreamingResponse> {
     try {
-      const response = await fetch('/api/ai/chat', {
+      // Try direct API first, fallback to Claude Code SDK
+      const apiEndpoint = '/api/ai/chat-direct'
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

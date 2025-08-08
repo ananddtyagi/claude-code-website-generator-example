@@ -49,7 +49,7 @@ export default function App() {
       }
     }
 
-    const files: Record<string, string> = {}
+    let files: Record<string, string> = {}
 
     // Convert all file nodes to Sandpack file format
     for (const node of project.nodes.values()) {
@@ -57,25 +57,14 @@ export default function App() {
         // Sandpack expects paths without leading slash
         const sandpackPath = node.path.startsWith('/') ? node.path.slice(1) : node.path
         files[sandpackPath] = node.content
+        console.log('Loading file for Sandpack:', sandpackPath, 'Content preview:', node.content.substring(0, 100))
       }
     }
 
     // For Next.js projects, create an App.tsx entry point from app/page.tsx if it exists
     if (files['app/page.tsx'] && !files['App.tsx']) {
-      // Extract the default export component and create a standalone App.tsx
-      const pageContent = files['app/page.tsx']
-
-      // Simple regex to extract the component content
-      const componentMatch = pageContent.match(/export default function (\w+)\(\s*\)\s*{([\s\S]*)}/)
-      if (componentMatch) {
-        const componentBody = componentMatch[2]
-        files['App.tsx'] = `import React from 'react';
-
-export default function App() {${componentBody}}`
-      } else {
-        // Fallback: use the entire page content but rename the export
-        files['App.tsx'] = pageContent.replace('export default function Home()', 'export default function App()')
-      }
+      // Use the page content as the base for App.tsx
+      files['App.tsx'] = files['app/page.tsx']
     }
 
     // Ensure we have a basic CSS file
@@ -96,11 +85,94 @@ export default function App() {${componentBody}}`
       files['styles.css'] = files['app/globals.css']
     }
 
-    // Replace Tailwind classes with inline styles for Sandpack compatibility
+    // Simple and reliable component inlining for Sandpack
+    const inlineAllComponents = (files: Record<string, string>): Record<string, string> => {
+      const processedFiles = { ...files }
+      
+      // Process App.tsx (or any main component file)
+      if (processedFiles['App.tsx']) {
+        let appContent = processedFiles['App.tsx']
+        let allComponentDefinitions = ''
+        
+        // Find all import statements
+        const importRegex = /import\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g
+        const imports = [...appContent.matchAll(importRegex)]
+        
+        console.log('Found imports in App.tsx:', imports.map(i => `${i[1]} from ${i[2]}`))
+        
+        // Process each import
+        imports.forEach(([fullImport, componentName, importPath]) => {
+          // Skip React and other external imports
+          if (importPath.startsWith('.') || importPath.startsWith('@/')) {
+            // Resolve the file path
+            let resolvedPath = importPath
+              .replace('@/', '')
+              .replace('./', '')
+              .replace(/^components\//, 'components/')
+            
+            // Try different extensions
+            const filesToCheck = [
+              resolvedPath + '.tsx',
+              resolvedPath + '.jsx',
+              resolvedPath + '.ts',
+              resolvedPath + '.js',
+              resolvedPath
+            ]
+            
+            for (const filePath of filesToCheck) {
+              if (processedFiles[filePath]) {
+                console.log(`Found file for ${componentName}: ${filePath}`)
+                
+                // Extract the entire file content and adapt it
+                let fileContent = processedFiles[filePath]
+                
+                // Remove all imports from the component file
+                fileContent = fileContent.replace(/import\s+[^;]+;\s*\n?/g, '')
+                
+                // Remove export default and just get the component
+                fileContent = fileContent.replace(/export\s+default\s+/g, '')
+                
+                // Add the component definition
+                allComponentDefinitions += `\n// Inlined from ${filePath}\n${fileContent}\n`
+                break
+              }
+            }
+          }
+        })
+        
+        // Remove all local imports from App.tsx
+        appContent = appContent.replace(/import\s+\w+\s+from\s+['"](?:\.\/|@\/)[^'"]+['"]\s*;?\s*\n?/g, '')
+        
+        // Add all component definitions after React import
+        if (allComponentDefinitions) {
+          const reactImportMatch = appContent.match(/(import\s+React[^;]*;?\s*\n?)/)
+          if (reactImportMatch) {
+            appContent = appContent.replace(
+              reactImportMatch[0],
+              reactImportMatch[0] + '\n' + allComponentDefinitions + '\n'
+            )
+          } else {
+            appContent = allComponentDefinitions + '\n\n' + appContent
+          }
+        }
+        
+        processedFiles['App.tsx'] = appContent
+        console.log('Final App.tsx preview:', appContent.substring(0, 500))
+      }
+      
+      return processedFiles
+    }
+    
+    // First inline all components
+    files = inlineAllComponents(files)
+    
+    // Then process each file for Tailwind conversion
     for (const [path, content] of Object.entries(files)) {
       if (path.endsWith('.tsx') || path.endsWith('.jsx')) {
+        let processedContent = content
+        
         // Convert common Tailwind classes to inline styles
-        files[path] = content
+        processedContent = processedContent
           .replace(/className="([^"]*)"/g, (match, classes) => {
             const styles: Record<string, string> = {}
 
@@ -162,11 +234,22 @@ export default function App() {${componentBody}}`
 
             return styleString ? `style={{${styleString}}}` : match
           })
-          .replace(/import.*from ['"][^'"]*['"]/g, '') // Remove import statements that might break in Sandpack
-          .replace(/export\s+default\s+function\s+\w+/, 'export default function App') // Ensure function is named App for consistency
+          .replace(/import.*from ['"]react['"]/g, "import React from 'react'") // Normalize React imports
+          .replace(/export\s+default\s+function\s+(\w+)/, (match, name) => {
+            // Only rename to App if it's not already App (to avoid duplicate declaration)
+            return name === 'App' ? match : 'export default function App'
+          }) // Ensure function is named App
+        
+        files[path] = processedContent
+        
+        // Debug log the final App.tsx content
+        if (path === 'App.tsx') {
+          console.log('Final App.tsx content:', processedContent)
+        }
       }
     }
 
+    console.log('All Sandpack files:', Object.keys(files))
     return files
   }, [project])
 

@@ -5,6 +5,11 @@ import { ProjectContext, AIConfiguration } from '../../../../lib/ai/types'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+// Ensure proper Node.js environment
+if (typeof process === 'undefined') {
+  throw new Error('Claude Code SDK requires Node.js environment')
+}
+
 interface ChatRequest {
   message: string
   context: ProjectContext
@@ -82,17 +87,33 @@ function summarizeFileStructure(node: unknown, prefix = '', maxDepth = 3, curren
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 AI Chat API called')
+  
   try {
     const body: ChatRequest = await request.json()
+    console.log('📝 Request body:', JSON.stringify(body, null, 2))
+    
     const { message, context, config, sessionId } = body
 
     // Validate required fields
     if (!message || !context) {
+      console.log('❌ Missing required fields')
       return NextResponse.json(
         { error: 'Missing required fields: message and context' },
         { status: 400 }
       )
     }
+
+    // Check API key
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.log('❌ No API key found in environment')
+      return NextResponse.json(
+        { error: 'Anthropic API key not configured' },
+        { status: 500 }
+      )
+    }
+    console.log('✅ API key found:', apiKey.substring(0, 20) + '...')
 
     // Set up streaming response
     const encoder = new TextEncoder()
@@ -104,16 +125,24 @@ export async function POST(request: NextRequest) {
 
         // Start AI query
         try {
+          console.log('🤖 Starting Claude Code SDK query...')
+          console.log('📋 System prompt length:', systemPrompt.length)
+          console.log('💬 User message:', message.substring(0, 100) + '...')
+          
           let fullResponse = ''
+
+          const queryOptions = {
+            appendSystemPrompt: systemPrompt,
+            maxTurns: config.maxTurns || 5,
+            allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch"],
+            ...(sessionId && { resumeSessionId: sessionId })
+          }
+          
+          console.log('⚙️ Query options:', JSON.stringify(queryOptions, null, 2))
 
           for await (const response of query({
             prompt: message,
-            options: {
-              appendSystemPrompt: systemPrompt,
-              maxTurns: config.maxTurns || 5,
-              allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch"],
-              ...(sessionId && { resumeSessionId: sessionId })
-            }
+            options: queryOptions
           })) {
             
             if (response.type === 'system' && response.subtype === 'init') {
@@ -170,11 +199,24 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (error) {
-          console.error('AI query error:', error)
+          console.error('❌ AI query error:', error)
+          console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+          console.error('Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            name: error instanceof Error ? error.name : typeof error,
+            code: (error as any)?.code,
+            signal: (error as any)?.signal,
+            status: (error as any)?.status
+          })
+          
           const errorData = {
             type: 'error',
-            content: 'Failed to communicate with AI service',
-            error: error instanceof Error ? error.message : String(error)
+            content: 'Failed to communicate with AI service. Please check your API key and try again.',
+            error: error instanceof Error ? error.message : String(error),
+            details: {
+              code: (error as any)?.code,
+              signal: (error as any)?.signal
+            }
           }
           controller.enqueue(encoder.encode(JSON.stringify(errorData) + '\n'))
           controller.close()
