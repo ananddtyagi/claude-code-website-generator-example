@@ -191,14 +191,26 @@ export function ResizableLayout() {
       <div className="h-full grid grid-cols-1 md:grid-cols-3">
         <div className="hidden md:block"><ChatPanel /></div>
         <div className="hidden md:block">
-          <FileNav 
-            project={currentProject}
-            onProjectChange={handleProjectChange}
-            onFileSelect={handleFileSelect}
-            selectedFileId={selectedFile?.id}
-          />
+          <div className="h-full flex flex-col">
+            <div className="h-1/3 min-h-[200px] border-b">
+              <FileNav 
+                project={currentProject}
+                onProjectChange={handleProjectChange}
+                onFileSelect={handleFileSelect}
+                selectedFileId={selectedFile?.id}
+              />
+            </div>
+            <div className="flex-1 min-h-0">
+              <EditorPanel 
+                project={currentProject}
+                selectedFile={selectedFile}
+                onFileChange={handleFileChange}
+                onProjectChange={handleProjectChange}
+              />
+            </div>
+          </div>
         </div>
-        <Preview />
+        <Preview project={currentProject} />
       </div>
     )
   }
@@ -207,7 +219,7 @@ export function ResizableLayout() {
     <div className="h-full">
       {/* Mobile view */}
       <div className="md:hidden h-full">
-        <Preview />
+        <Preview project={currentProject} />
       </div>
       
       {/* Desktop view */}
@@ -234,12 +246,24 @@ export function ResizableLayout() {
             maxSize={75}
             className="min-w-[240px]"
           >
-            <FileNav 
-              project={currentProject}
-              onProjectChange={handleProjectChange}
-              onFileSelect={handleFileSelect}
-              selectedFileId={selectedFile?.id}
-            />
+            <div className="h-full flex flex-col">
+              <div className="h-1/3 min-h-[200px] border-b">
+                <FileNav 
+                  project={currentProject}
+                  onProjectChange={handleProjectChange}
+                  onFileSelect={handleFileSelect}
+                  selectedFileId={selectedFile?.id}
+                />
+              </div>
+              <div className="flex-1 min-h-0">
+                <EditorPanel 
+                  project={currentProject}
+                  selectedFile={selectedFile}
+                  onFileChange={handleFileChange}
+                  onProjectChange={handleProjectChange}
+                />
+              </div>
+            </div>
           </Panel>
           
           <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
@@ -250,12 +274,7 @@ export function ResizableLayout() {
             maxSize={75}
             className="min-w-[240px]"
           >
-            <EditorPanel 
-              project={currentProject}
-              selectedFile={selectedFile}
-              onFileChange={handleFileChange}
-              onProjectChange={handleProjectChange}
-            />
+            <Preview project={currentProject} />
           </Panel>
         </PanelGroup>
       </div>

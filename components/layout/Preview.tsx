@@ -1,11 +1,17 @@
 "use client"
 
-export function Preview() {
+import { SandpackPreview } from '../preview/SandpackPreview'
+import { Project } from '@/lib/filesystem/types'
+
+interface PreviewProps {
+  project?: Project | null
+  className?: string
+}
+
+export function Preview({ project, className }: PreviewProps) {
   return (
-    <div className="h-full bg-muted/50 p-4" role="region" aria-label="Preview">
-      <div className="text-sm text-muted-foreground">
-        Preview will go here
-      </div>
+    <div className={`h-full ${className}`} role="region" aria-label="Preview">
+      <SandpackPreview project={project || null} className="h-full" />
     </div>
   )
 }
