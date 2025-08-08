@@ -1,5 +1,9 @@
 import { AppLayout } from "@/components/layout/AppLayout"
 
 export default function Home() {
-  return <AppLayout />
+  return (
+    <div className="h-full">
+      <AppLayout />
+    </div>
+  )
 }
