@@ -30,9 +30,24 @@ export function ChatMessage({ message, isStreaming = false }: ChatMessageProps) 
         }
       }
 
-      // Add code block
+      // Check if this is a JSON block with file changes
       const language = match[1] || 'text'
       const code = match[2] || ''
+      
+      if (language === 'json') {
+        try {
+          const parsed = JSON.parse(code)
+          // Skip JSON blocks that contain file changes
+          if (parsed.changes && Array.isArray(parsed.changes)) {
+            lastIndex = match.index + match[0].length
+            continue
+          }
+        } catch {
+          // Not valid JSON or doesn't contain changes, show it
+        }
+      }
+
+      // Add non-file-change code blocks
       parts.push({ type: 'code', language, content: code })
 
       lastIndex = match.index + match[0].length

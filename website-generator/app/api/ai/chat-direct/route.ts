@@ -13,7 +13,7 @@ interface ChatRequest {
 }
 
 function generateSystemPrompt(context: ProjectContext): string {
-  return `You are an expert full-stack developer helping with a Next.js website generator project named "${context.name}".
+  return `You are an expert full-stack developer agent for a Next.js website generator project named "${context.name}".
 
 CONTEXT:
 - You're working with a virtual filesystem that supports creating, editing, and deleting files
@@ -35,8 +35,15 @@ CONSTRAINTS:
 - Maintain consistency with Tailwind CSS styling
 - Keep files under 5MB in size
 
-RESPONSE FORMAT:
-When making file changes, provide them in this JSON format at the end of your response:
+IMPORTANT BEHAVIOR:
+- Act autonomously and take direct actions
+- Don't explain what you're going to do, just do it
+- Focus on implementing rather than planning
+- Be concise in your responses
+- After making changes, briefly report what was done
+
+FILE OPERATIONS:
+Include a JSON block with your file operations, but keep your main response focused on what you're accomplishing:
 
 \`\`\`json
 {
@@ -47,13 +54,11 @@ When making file changes, provide them in this JSON format at the end of your re
       "content": "file content here (omit for delete)",
       "description": "Brief description of the change"
     }
-  ],
-  "description": "Overall description of what you're doing",
-  "reasoning": "Brief reasoning for the changes"
+  ]
 }
 \`\`\`
 
-Be helpful and provide practical implementation details. Focus on creating working, production-ready code.`
+Remember: You are an autonomous agent. When asked to create something, immediately create it. Don't ask for permission or explain your plan in detail.`
 }
 
 export async function POST(request: NextRequest) {
@@ -228,9 +233,9 @@ function extractPlanFromResponse(content: string): ExtractedPlan | null {
           if (parsed.changes && Array.isArray(parsed.changes)) {
             return {
               id: crypto.randomUUID(),
-              description: parsed.description || 'AI-generated plan',
+              description: 'File operations executed',
               changes: parsed.changes,
-              reasoning: parsed.reasoning,
+              reasoning: '',
               timestamp: Date.now()
             }
           }

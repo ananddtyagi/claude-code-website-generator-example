@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { ChatHistory } from '../chat/ChatHistory'
 import { ChatInput } from '../chat/ChatInput'
-import { PlanViewer } from '../chat/PlanViewer'
 import { DiffViewer } from '../diff/DiffViewer'
 import { ClientAIService } from '../../lib/ai/client-ai-service'
 import { 
@@ -33,14 +32,12 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
     isLoading: false
   })
   
-  const [currentPlan, setCurrentPlan] = useState<ChangePlan | null>(null)
   const [showDiff, setShowDiff] = useState<{
     change: FileChange
     originalContent: string
   } | null>(null)
   
   const [aiService, setAiService] = useState<ClientAIService | null>(null)
-  const [isApplying, setIsApplying] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [useMockAI, setUseMockAI] = useState(false)
@@ -151,7 +148,6 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
     })
 
     setChatState(prev => ({ ...prev, isLoading: true }))
-    setCurrentPlan(null)
 
     try {
       // Use the real AI implementation or mock based on user preference
@@ -166,8 +162,9 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
             break
             
           case 'plan':
-            if (response.plan) {
-              setCurrentPlan(response.plan)
+            if (response.plan && project && onProjectUpdate) {
+              // Auto-apply the plan immediately
+              handleApplyPlan(response.plan)
             }
             break
             
@@ -218,8 +215,6 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
   const handleApplyPlan = async (plan: ChangePlan) => {
     if (!project || !onProjectUpdate) return
 
-    setIsApplying(true)
-    
     try {
       const operations = new FileSystemOperations(project)
       let hasChanges = false
@@ -311,11 +306,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
         project.updatedAt = new Date()
         onProjectUpdate(project)
         
-        // Add success message
-        addMessage({
-          role: 'system',
-          content: `Successfully applied ${plan.changes.length} changes to your project.`
-        })
+        // Success - changes applied automatically
       }
 
     } catch (error) {
@@ -325,18 +316,10 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
         content: 'Failed to apply some changes. Please check the console for details.'
       })
     } finally {
-      setIsApplying(false)
-      setCurrentPlan(null)
+      // Cleanup done
     }
   }
 
-  const handleRejectPlan = () => {
-    setCurrentPlan(null)
-    addMessage({
-      role: 'system', 
-      content: 'Plan rejected. Feel free to ask for different changes.'
-    })
-  }
 
   if (showSettings || !aiService) {
     return (
@@ -418,18 +401,7 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
         className="flex-1 min-h-0"
       />
 
-      {/* Plan Viewer */}
-      {currentPlan && (
-        <div className="border-t p-4 max-h-96 overflow-y-auto">
-          <PlanViewer
-            plan={currentPlan}
-            onApprove={handleApplyPlan}
-            onReject={handleRejectPlan}
-            onPreviewChange={handlePreviewChange}
-            isApplying={isApplying}
-          />
-        </div>
-      )}
+      {/* Auto-applying changes - no manual approval needed */}
 
       {/* Chat Input */}
       <ChatInput
