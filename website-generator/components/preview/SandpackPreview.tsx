@@ -291,7 +291,7 @@ export default function App() {
   return (
     <div className={`h-full ${className}`}>
       <div
-        className="h-full [&_.sp-wrapper]:h-full [&_.sp-layout]:h-full [&_.sp-preview-container]:h-full"
+        className="h-full [&_.sp-wrapper]:h-full [&_.sp-layout]:h-full [&_.sp-preview-container]:h-full [&_.sp-preview-iframe]:h-full [&_.sp-stack]:h-full"
         style={{ '--sp-border-radius': '0' } as React.CSSProperties}
       >
         <div style={{ height: '100%' }}>
@@ -309,6 +309,9 @@ export default function App() {
               editorWidthPercentage: 0,
               autorun: true,
               autoReload: true,
+            }}
+            style={{
+              height: '100%',
             }}
           />
         </div>

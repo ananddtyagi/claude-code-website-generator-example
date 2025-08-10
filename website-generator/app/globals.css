@@ -7,6 +7,30 @@ body {
   overflow: hidden;
 }
 
+/* Ensure Sandpack components use full height */
+.sp-wrapper,
+.sp-layout,
+.sp-preview-container,
+.sp-preview-iframe,
+.sp-stack {
+  height: 100% !important;
+}
+
+/* Remove any default margins/paddings that might cause cutoff */
+.sp-preview-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.sp-preview-actions {
+  flex-shrink: 0;
+}
+
+.sp-preview-iframe {
+  flex: 1;
+  border: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

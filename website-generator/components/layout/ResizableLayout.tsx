@@ -3,14 +3,12 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { ChatPanel } from "./ChatPanel"
-import { FileNav } from "./FileNav"
-import { Preview } from "./Preview"
-import { EditorPanel } from "../editor/EditorPanel"
+import { LeftTabbedPanel } from "./LeftTabbedPanel"
 import { Project, FSNode } from "@/lib/filesystem/types"
 import { ProjectStore } from "@/lib/storage/project-store"
 import { createSampleProject } from "@/lib/dev/sample-data"
 
-const DEFAULT_LAYOUT = [25, 25, 50]
+const DEFAULT_LAYOUT = [50, 50]
 
 export function ResizableLayout() {
   const [isClient, setIsClient] = useState(false)
@@ -27,7 +25,7 @@ export function ResizableLayout() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as number[]
-        if (parsed.length === 3) {
+        if (parsed.length === 2) {
           setDefaultLayout(parsed)
         }
       } catch {
@@ -204,8 +202,8 @@ export function ResizableLayout() {
 
   if (!isClient) {
     return (
-      <div className="h-full grid grid-cols-1 md:grid-cols-3">
-        <div className="hidden md:block">
+      <div className="h-full grid grid-cols-1 md:grid-cols-2">
+        <div className="">
           <ChatPanel 
             project={currentProject}
             onFileChange={handleAIFileChange}
@@ -213,26 +211,14 @@ export function ResizableLayout() {
           />
         </div>
         <div className="hidden md:block">
-          <div className="h-full flex flex-col">
-            <div className="h-1/3 min-h-[200px] border-b">
-              <FileNav 
-                project={currentProject}
-                onProjectChange={handleProjectChange}
-                onFileSelect={handleFileSelect}
-                selectedFileId={selectedFile?.id}
-              />
-            </div>
-            <div className="flex-1 min-h-0">
-              <EditorPanel 
-                project={currentProject}
-                selectedFile={selectedFile}
-                onFileChange={handleFileChange}
-                onProjectChange={handleProjectChange}
-              />
-            </div>
-          </div>
+          <LeftTabbedPanel 
+            project={currentProject}
+            onProjectChange={handleProjectChange}
+            selectedFile={selectedFile}
+            onFileSelect={handleFileSelect}
+            onFileChange={handleFileChange}
+          />
         </div>
-        <Preview project={currentProject} />
       </div>
     )
   }
@@ -241,7 +227,11 @@ export function ResizableLayout() {
     <div className="h-full">
       {/* Mobile view */}
       <div className="md:hidden h-full">
-        <Preview project={currentProject} />
+        <ChatPanel 
+          project={currentProject}
+          onFileChange={handleAIFileChange}
+          onProjectUpdate={handleProjectChange}
+        />
       </div>
       
       {/* Desktop view */}
@@ -253,9 +243,9 @@ export function ResizableLayout() {
         >
           <Panel 
             defaultSize={defaultLayout[0]} 
-            minSize={15} 
-            maxSize={75}
-            className="min-w-[240px]"
+            minSize={30} 
+            maxSize={70}
+            className="min-w-[320px]"
           >
             <ChatPanel 
               project={currentProject}
@@ -268,39 +258,17 @@ export function ResizableLayout() {
           
           <Panel 
             defaultSize={defaultLayout[1]} 
-            minSize={15} 
-            maxSize={75}
-            className="min-w-[240px]"
+            minSize={30} 
+            maxSize={70}
+            className="min-w-[320px]"
           >
-            <div className="h-full flex flex-col">
-              <div className="h-1/3 min-h-[200px] border-b">
-                <FileNav 
-                  project={currentProject}
-                  onProjectChange={handleProjectChange}
-                  onFileSelect={handleFileSelect}
-                  selectedFileId={selectedFile?.id}
-                />
-              </div>
-              <div className="flex-1 min-h-0">
-                <EditorPanel 
-                  project={currentProject}
-                  selectedFile={selectedFile}
-                  onFileChange={handleFileChange}
-                  onProjectChange={handleProjectChange}
-                />
-              </div>
-            </div>
-          </Panel>
-          
-          <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
-          
-          <Panel 
-            defaultSize={defaultLayout[2]} 
-            minSize={15} 
-            maxSize={75}
-            className="min-w-[240px]"
-          >
-            <Preview project={currentProject} />
+            <LeftTabbedPanel 
+              project={currentProject}
+              onProjectChange={handleProjectChange}
+              selectedFile={selectedFile}
+              onFileSelect={handleFileSelect}
+              onFileChange={handleFileChange}
+            />
           </Panel>
         </PanelGroup>
       </div>
