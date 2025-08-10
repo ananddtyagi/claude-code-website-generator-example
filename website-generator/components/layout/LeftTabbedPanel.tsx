@@ -3,7 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileNav } from "./FileNav"
 import { Preview } from "./Preview"
-import { EditorPanel } from "../editor/EditorPanel"
+import { EditorPanel, EditorState } from "../editor/EditorPanel"
 import { Project, FSNode } from "@/lib/filesystem/types"
 
 interface LeftTabbedPanelProps {
@@ -12,6 +12,7 @@ interface LeftTabbedPanelProps {
   selectedFile: FSNode | null
   onFileSelect: (node: FSNode) => void
   onFileChange: (fileId: string, content: string) => void
+  onEditorStateChange?: (state: EditorState) => void
 }
 
 export function LeftTabbedPanel({
@@ -19,7 +20,8 @@ export function LeftTabbedPanel({
   onProjectChange,
   selectedFile,
   onFileSelect,
-  onFileChange
+  onFileChange,
+  onEditorStateChange
 }: LeftTabbedPanelProps) {
   return (
     <div className="h-full flex flex-col">
@@ -45,6 +47,7 @@ export function LeftTabbedPanel({
                 selectedFile={selectedFile}
                 onFileChange={onFileChange}
                 onProjectChange={onProjectChange}
+                onEditorStateChange={onEditorStateChange}
               />
             </div>
           </div>

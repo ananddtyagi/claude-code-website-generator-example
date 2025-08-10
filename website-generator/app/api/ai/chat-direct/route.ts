@@ -13,12 +13,18 @@ interface ChatRequest {
 }
 
 function generateSystemPrompt(context: ProjectContext): string {
+  const openFileContents = getOpenFileContents(context)
+  
   return `You are an expert full-stack developer agent for a Next.js website generator project named "${context.name}".
 
 CONTEXT:
 - You're working with a virtual filesystem that supports creating, editing, and deleting files
 - The project uses Next.js 15 with TypeScript, React 19, Tailwind CSS, and Monaco Editor
-- Current project structure exists with standard Next.js files
+- Currently open files: ${context.openFiles.join(', ') || 'none'}
+- Current file being edited: ${context.currentFile || 'none'}
+
+CURRENT FILE CONTENTS:
+${openFileContents}
 
 CAPABILITIES:
 - Analyze the existing codebase and project structure
@@ -59,6 +65,69 @@ Include a JSON block with your file operations, but keep your main response focu
 \`\`\`
 
 Remember: You are an autonomous agent. When asked to create something, immediately create it. Don't ask for permission or explain your plan in detail.`
+}
+
+function getOpenFileContents(context: ProjectContext): string {
+  if (!context.openFiles.length) {
+    return 'No files are currently open in the editor.'
+  }
+  
+  const contents: string[] = []
+  
+  for (const filePath of context.openFiles) {
+    // The context.structure should be a project with nodes Map
+    // We need to find the file by iterating through all nodes and matching the path
+    const fileNode = findFileNodeByPath(context.structure, filePath)
+    if (fileNode && fileNode.type === 'file') {
+      const isCurrentFile = filePath === context.currentFile
+      const marker = isCurrentFile ? ' (CURRENTLY ACTIVE)' : ''
+      
+      contents.push(`
+--- ${filePath}${marker} ---
+${fileNode.content || '(empty file)'}
+`)
+    }
+  }
+  
+  return contents.join('\n')
+}
+
+function findFileNodeByPath(rootNode: unknown, targetPath: string): unknown {
+  if (!rootNode || typeof rootNode !== 'object') return null
+  
+  const node = rootNode as Record<string, unknown>
+  
+  // Handle case where rootNode is the filesystem structure with a nodes map
+  if (node.nodes && typeof node.nodes === 'object') {
+    // If it's a Map, convert to array
+    const nodesArray = node.nodes instanceof Map ? 
+      Array.from(node.nodes.values()) : 
+      Object.values(node.nodes as Record<string, unknown>)
+    for (const childNode of nodesArray) {
+      if (childNode && typeof childNode === 'object') {
+        const child = childNode as Record<string, unknown>
+        if (child.path === targetPath && child.type === 'file') {
+          return child
+        }
+      }
+    }
+    return null
+  }
+  
+  // Handle direct node traversal (recursive tree structure)
+  if (node.path === targetPath && node.type === 'file') {
+    return node
+  }
+  
+  if (node.children && node.type === 'directory') {
+    const children = Object.values(node.children as Record<string, unknown>)
+    for (const child of children) {
+      const result = findFileNodeByPath(child, targetPath)
+      if (result) return result
+    }
+  }
+  
+  return null
 }
 
 export async function POST(request: NextRequest) {

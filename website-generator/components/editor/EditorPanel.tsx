@@ -5,11 +5,17 @@ import { FSNode, FileNode, Project, isFile } from '@/lib/filesystem/types'
 import { CodeEditor } from './CodeEditor'
 import { EditorTabManager, EditorTab } from './EditorTabManager'
 
+export interface EditorState {
+  openFiles: string[]  // Array of file paths
+  currentFile?: string  // Path of current active file
+}
+
 interface EditorPanelProps {
   project: Project | null
   selectedFile: FSNode | null
   onFileChange: (fileId: string, content: string) => void
   onProjectChange: (project: Project) => void
+  onEditorStateChange?: (state: EditorState) => void
   className?: string
 }
 
@@ -18,6 +24,7 @@ export function EditorPanel({
   selectedFile, 
   onFileChange, 
   onProjectChange,
+  onEditorStateChange,
   className 
 }: EditorPanelProps) {
   const [openTabs, setOpenTabs] = useState<EditorTab[]>([])
@@ -131,6 +138,21 @@ export function EditorPanel({
       )
     }
   }, [activeTabId, project, openTabs, onProjectChange])
+
+  // Notify parent component when editor state changes
+  useEffect(() => {
+    if (onEditorStateChange) {
+      const openFiles = openTabs.map(tab => tab.path)
+      const currentFile = activeTabId && openTabs.find(tab => tab.fileId === activeTabId)?.path
+      
+      const editorState: EditorState = {
+        openFiles,
+        currentFile
+      }
+      
+      onEditorStateChange(editorState)
+    }
+  }, [openTabs, activeTabId, onEditorStateChange])
 
   const activeTab = openTabs.find(tab => tab.fileId === activeTabId)
   const activeFile = activeTab && project ? project.nodes.get(activeTab.fileId) as FileNode | undefined : null

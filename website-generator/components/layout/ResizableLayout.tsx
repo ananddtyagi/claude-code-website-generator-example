@@ -7,6 +7,7 @@ import { LeftTabbedPanel } from "./LeftTabbedPanel"
 import { Project, FSNode } from "@/lib/filesystem/types"
 import { ProjectStore } from "@/lib/storage/project-store"
 import { createSampleProject } from "@/lib/dev/sample-data"
+import { EditorState } from "../editor/EditorPanel"
 
 const DEFAULT_LAYOUT = [50, 50]
 
@@ -15,6 +16,7 @@ export function ResizableLayout() {
   const [defaultLayout, setDefaultLayout] = useState(DEFAULT_LAYOUT)
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [selectedFile, setSelectedFile] = useState<FSNode | null>(null)
+  const [editorState, setEditorState] = useState<EditorState>({ openFiles: [] })
   const autosaveSchedulerRef = useRef<(() => void) | null>(null)
   const autosaveCleanupRef = useRef<(() => void) | null>(null)
   const projectStoreRef = useRef<ProjectStore | null>(null)
@@ -160,6 +162,10 @@ export function ResizableLayout() {
     setSelectedFile(node)
   }, [])
 
+  const handleEditorStateChange = useCallback((state: EditorState) => {
+    setEditorState(state)
+  }, [])
+
   const handleFileChange = useCallback((fileId: string, content: string) => {
     if (!currentProject) return
 
@@ -208,6 +214,7 @@ export function ResizableLayout() {
             project={currentProject}
             onFileChange={handleAIFileChange}
             onProjectUpdate={handleProjectChange}
+            editorState={editorState}
           />
         </div>
         <div className="hidden md:block">
@@ -217,6 +224,7 @@ export function ResizableLayout() {
             selectedFile={selectedFile}
             onFileSelect={handleFileSelect}
             onFileChange={handleFileChange}
+            onEditorStateChange={handleEditorStateChange}
           />
         </div>
       </div>
@@ -231,6 +239,7 @@ export function ResizableLayout() {
           project={currentProject}
           onFileChange={handleAIFileChange}
           onProjectUpdate={handleProjectChange}
+          editorState={editorState}
         />
       </div>
       
@@ -251,6 +260,7 @@ export function ResizableLayout() {
               project={currentProject}
               onFileChange={handleAIFileChange}
               onProjectUpdate={handleProjectChange}
+              editorState={editorState}
             />
           </Panel>
           
@@ -268,6 +278,7 @@ export function ResizableLayout() {
               selectedFile={selectedFile}
               onFileSelect={handleFileSelect}
               onFileChange={handleFileChange}
+              onEditorStateChange={handleEditorStateChange}
             />
           </Panel>
         </PanelGroup>

@@ -19,14 +19,16 @@ import { validateFilePath } from '../../lib/ai/schemas'
 import { generateId } from '../../lib/utils/id'
 import { Button } from '../ui/button'
 import { Settings } from 'lucide-react'
+import { EditorState } from '../editor/EditorPanel'
 
 interface ChatPanelProps {
   project?: Project | null
   onFileChange?: (path: string, content: string) => void
   onProjectUpdate?: (project: Project) => void
+  editorState?: EditorState
 }
 
-export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelProps) {
+export function ChatPanel({ project, onFileChange, onProjectUpdate, editorState }: ChatPanelProps) {
   const [chatState, setChatState] = useState<ChatState>({
     messages: [],
     isLoading: false
@@ -77,13 +79,17 @@ export function ChatPanel({ project, onFileChange, onProjectUpdate }: ChatPanelP
 
     return {
       name: project.name,
-      structure: Array.from(project.nodes.values()).find(node => 
-        node.path === '/' && node.type === 'directory'
-      ) as FSNode,
-      openFiles: [], // TODO: Get from editor state
-      currentFile: undefined // TODO: Get from editor state
+      structure: {
+        ...project,
+        // Ensure we pass the full project structure including all nodes
+        rootNode: Array.from(project.nodes.values()).find(node => 
+          node.path === '/' && node.type === 'directory'
+        ) as FSNode
+      } as unknown,
+      openFiles: editorState?.openFiles || [],
+      currentFile: editorState?.currentFile
     }
-  }, [project])
+  }, [project, editorState])
 
   const addMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
     const newMessage: ChatMessage = {

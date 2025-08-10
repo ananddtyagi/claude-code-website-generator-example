@@ -163,4 +163,41 @@ The website generator now works more like an agentic system:
 - Changes are applied automatically without approval
 - Chat shows what was accomplished, not what will be done
 
+## Recent Updates
+
+### 2025-01-10 - Claude Code SDK Context Fix
+**Issue:** The Claude Code SDK bot wasn't receiving the current state of the project files, causing it to completely replace everything every time instead of understanding the existing codebase.
+
+**Root Cause Analysis:**
+1. The `buildProjectContext` function in `ChatPanel.tsx` was passing hardcoded empty arrays for `openFiles` and `undefined` for `currentFile`
+2. The system prompts in API routes weren't including actual file contents, only file structure and names
+3. The bot had no context about what files were currently open or their contents
+
+**Solution Implemented:**
+1. **Enhanced Editor State Management:**
+   - Added `EditorState` interface with `openFiles` and `currentFile` properties
+   - Modified `EditorPanel.tsx` to expose its internal state via `onEditorStateChange` callback
+   - Updated component hierarchy to pass editor state from `EditorPanel` → `LeftTabbedPanel` → `ResizableLayout` → `ChatPanel`
+
+2. **Improved System Prompts:**
+   - Added `getOpenFileContents()` function to both API routes (`/api/ai/chat/route.ts` and `/api/ai/chat-direct/route.ts`)
+   - Enhanced system prompts to include actual content of currently open files
+   - Added file path resolution to correctly find files in the virtual filesystem
+
+3. **Fixed Context Building:**
+   - Updated `buildProjectContext()` to use actual editor state instead of hardcoded values
+   - Modified context structure to pass full project data including all nodes Map
+   - Added proper file lookup by path in the flat filesystem structure
+
+**Technical Details:**
+- The virtual filesystem uses a flat `Map<string, FSNode>` structure, not nested trees
+- Context now includes full file contents with markers for the currently active file
+- System prompt format: `--- /path/to/file.tsx (CURRENTLY ACTIVE) ---`
+
+**Impact:**
+- Claude Code SDK bot now has full awareness of currently open files and their contents
+- AI responses are based on existing codebase state rather than starting from scratch
+- Maintains context across edit sessions and understands component relationships
+- Significantly improved code generation accuracy and consistency
+
 Last Updated: 2025-01-10
