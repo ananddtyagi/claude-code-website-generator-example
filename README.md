@@ -1,6 +1,8 @@
 # AI-Powered Website Generator
 
-A sophisticated web-based IDE that enables users to create, edit, and preview websites through natural language interactions with AI assistance powered by Claude.
+A sophisticated web-based IDE that enables users to build websites using Claude Code SDK.
+
+This was made almost entirely by Claude Code and prompting as an example of how to use Claude Code and what it can accomplish.
 
 ## Features
 
